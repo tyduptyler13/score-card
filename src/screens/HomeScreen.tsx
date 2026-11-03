@@ -1,7 +1,13 @@
 import type { Game, GameType } from '../types';
 import { GAME_TYPE_INFO, summary, winnerIds, playerName } from '../games';
 
-const ORDER: GameType[] = ['phase10', 'fivecrowns', 'golf', 'custom'];
+const ORDER: GameType[] = [
+  'phase10',
+  'fivecrowns',
+  'rummy500',
+  'golf',
+  'custom',
+];
 
 interface Props {
   games: Game[];

@@ -4,6 +4,8 @@ import type {
   GameType,
   Phase10Game,
   Player,
+  Rummy500Game,
+  Rummy500Round,
   Standing,
 } from './types';
 
@@ -38,6 +40,8 @@ export const FIVE_CROWNS_RANKS = [
   '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K',
 ];
 
+export const RUMMY500_DEFAULT_TARGET = 500;
+
 export const GAME_TYPE_INFO: Record<
   GameType,
   { name: string; blurb: string; rules: string[] }
@@ -60,6 +64,17 @@ export const GAME_TYPE_INFO: Record<
       'Jokers are always wild. A wild card left in your hand scores 20 points; a Joker scores 50.',
       'After each round, enter the points left in hand: numbers face value, J = 11, Q = 12, K = 13.',
       'Runs and books must be 3+ cards. Lowest total after 11 rounds wins.',
+    ],
+  },
+  rummy500: {
+    name: 'Rummy 500',
+    blurb:
+      'Every meld scores — race to the target while keeping your hand light.',
+    rules: [
+      'Every player scores each hand: add the value of the cards you melded or laid off, then subtract the value of the cards left in your hand.',
+      'Card values: A = 15 (1 or 5 when used low, per your house rule), K/Q/J/10 = 10, 2–9 = face value, Joker = 15.',
+      'The hand ends when a player empties their hand. Play continues until someone reaches the target score.',
+      'Highest total wins, and negative scores are allowed. If “must go out to win” is on, the player reaching the target must also be the one who went out that hand.',
     ],
   },
   golf: {
@@ -103,6 +118,14 @@ export function createGame(type: GameType, setup: GameSetup): Game {
       return { ...base, type, rounds: [] };
     case 'fivecrowns':
       return { ...base, type, rounds: [] };
+    case 'rummy500':
+      return {
+        ...base,
+        type,
+        target: setup.targetScore || RUMMY500_DEFAULT_TARGET,
+        mustGoOut: setup.mustGoOut,
+        rounds: [],
+      };
     case 'golf':
       return {
         ...base,
@@ -131,6 +154,16 @@ export function phaseOf(game: Phase10Game, playerId: string): number {
     if (round.phaseCompleted.includes(playerId)) completed += 1;
   }
   return Math.min(completed + 1, 10);
+}
+
+export function rummyRoundNet(
+  round: Rummy500Round,
+  playerId: string,
+): number | null {
+  const melds = round.melds[playerId];
+  const hands = round.hands[playerId];
+  if (melds == null && hands == null) return null;
+  return (melds ?? 0) - (hands ?? 0);
 }
 
 export function standings(game: Game): Standing[] {
@@ -167,6 +200,21 @@ export function standings(game: Game): Standing[] {
             scored >= FIVE_CROWNS_ROUNDS && scored >= game.rounds.length,
         };
       }
+      case 'rummy500': {
+        const value = game.rounds.reduce(
+          (acc, r) => acc + (rummyRoundNet(r, player.id) ?? 0),
+          0,
+        );
+        return {
+          playerId: player.id,
+          value,
+          detail:
+            value >= game.target
+              ? 'Target reached'
+              : `${game.target - value} to go`,
+          finished: value >= game.target,
+        };
+      }
       case 'golf': {
         const scored = game.holes.filter((h) => h[player.id] != null).length;
         return {
@@ -182,8 +230,11 @@ export function standings(game: Game): Standing[] {
 
 export function sortedStandings(game: Game): Standing[] {
   const list = standings(game);
-  return list.sort(
-    (a, b) => a.value - b.value || a.playerId.localeCompare(b.playerId),
+  const higherWins = game.type === 'rummy500';
+  return list.sort((a, b) =>
+    higherWins
+      ? b.value - a.value || a.playerId.localeCompare(b.playerId)
+      : a.value - b.value || a.playerId.localeCompare(b.playerId),
   );
 }
 
@@ -193,6 +244,12 @@ function hasAnyScore(game: Game): boolean {
       return game.rounds.some((r) => Object.values(r.scores).some((v) => v != null));
     case 'fivecrowns':
       return game.rounds.some((r) => Object.values(r.scores).some((v) => v != null));
+    case 'rummy500':
+      return game.rounds.some(
+        (r) =>
+          Object.values(r.melds).some((v) => v != null) ||
+          Object.values(r.hands).some((v) => v != null),
+      );
     case 'golf':
       return game.holes.some((h) => Object.values(h).some((v) => v != null));
     case 'custom':
@@ -203,6 +260,9 @@ function hasAnyScore(game: Game): boolean {
 export function winnerIds(game: Game): string[] | null {
   if (game.type === 'custom') return null;
   if (!hasAnyScore(game)) return null;
+
+  if (game.type === 'rummy500') return rummy500Winners(game);
+
   const list = standings(game);
   const anyFinished = list.some((s) => s.finished);
   const allFinished = list.every((s) => s.finished);
@@ -211,6 +271,34 @@ export function winnerIds(game: Game): string[] | null {
   if (!ready) return null;
   const min = Math.min(...list.map((s) => s.value));
   return list.filter((s) => s.value === min).map((s) => s.playerId);
+}
+
+function rummy500Winners(game: Rummy500Game): string[] | null {
+  if (game.mustGoOut) {
+    const totals: Record<string, number> = {};
+    for (const player of game.players) totals[player.id] = 0;
+    for (const round of game.rounds) {
+      for (const player of game.players) {
+        totals[player.id] += rummyRoundNet(round, player.id) ?? 0;
+      }
+      const eligible = round.wentOut.filter(
+        (id) =>
+          (round.melds[id] != null || round.hands[id] != null) &&
+          (totals[id] ?? 0) >= game.target,
+      );
+      if (eligible.length > 0) {
+        const max = Math.max(...eligible.map((id) => totals[id]));
+        return eligible.filter((id) => totals[id] === max);
+      }
+    }
+    return null;
+  }
+
+  const list = standings(game);
+  const reached = list.filter((s) => s.value >= game.target);
+  if (reached.length === 0) return null;
+  const max = Math.max(...reached.map((s) => s.value));
+  return reached.filter((s) => s.value === max).map((s) => s.playerId);
 }
 
 export function playerName(game: Game, playerId: string): string {
@@ -231,6 +319,11 @@ export function summary(game: Game): string {
   const tie = list.filter((s) => s.value === top.value).length > 1;
   if (game.type === 'phase10') {
     return tie ? `Tied at ${top.value} pts` : `${name} leads with ${top.value} pts`;
+  }
+  if (game.type === 'rummy500') {
+    return tie
+      ? `Tied at ${top.value} / ${game.target}`
+      : `${name} leads with ${top.value} / ${game.target}`;
   }
   return tie ? `Tied at ${top.value}` : `${name} leads with ${top.value}`;
 }

@@ -3,6 +3,7 @@ import { GAME_TYPE_INFO, playerName, sortedStandings, winnerIds } from '../games
 import Phase10Card from './scorecards/Phase10Card';
 import FiveCrownsCard from './scorecards/FiveCrownsCard';
 import GolfCard from './scorecards/GolfCard';
+import Rummy500Card from './scorecards/Rummy500Card';
 import WinConditionsCard from './scorecards/WinConditionsCard';
 
 interface Props {
@@ -62,6 +63,9 @@ export default function ScorecardScreen({ game, onChange, onBack }: Props) {
       )}
       {game.type === 'golf' && (
         <GolfCard game={game} update={(fn) => onChange((g) => (g.type === 'golf' ? fn(g) : g))} />
+      )}
+      {game.type === 'rummy500' && (
+        <Rummy500Card game={game} update={(fn) => onChange((g) => (g.type === 'rummy500' ? fn(g) : g))} />
       )}
       {game.type === 'custom' && (
         <WinConditionsCard game={game} update={(fn) => onChange((g) => (g.type === 'custom' ? fn(g) : g))} />
