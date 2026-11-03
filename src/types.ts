@@ -1,4 +1,9 @@
-export type GameType = 'phase10' | 'fivecrowns' | 'golf' | 'custom';
+export type GameType =
+  | 'phase10'
+  | 'fivecrowns'
+  | 'golf'
+  | 'rummy500'
+  | 'custom';
 
 export interface Player {
   id: string;
@@ -30,6 +35,19 @@ export interface GolfGame extends BaseGame {
   holeCount: number;
 }
 
+export interface Rummy500Round {
+  melds: Scores;
+  hands: Scores;
+  wentOut: string[];
+}
+
+export interface Rummy500Game extends BaseGame {
+  type: 'rummy500';
+  target: number;
+  mustGoOut: boolean;
+  rounds: Rummy500Round[];
+}
+
 export interface WinCondition {
   playerId: string | null;
   text: string;
@@ -40,12 +58,19 @@ export interface CustomGame extends BaseGame {
   conditions: WinCondition[];
 }
 
-export type Game = Phase10Game | FiveCrownsGame | GolfGame | CustomGame;
+export type Game =
+  | Phase10Game
+  | FiveCrownsGame
+  | GolfGame
+  | Rummy500Game
+  | CustomGame;
 
 export interface GameSetup {
   names: string[];
   holeCount: number;
   conditions: { playerIdx: number; text: string }[];
+  targetScore: number;
+  mustGoOut: boolean;
 }
 
 export interface Standing {

@@ -11,6 +11,8 @@ interface Props {
 export default function SetupScreen({ type, info, onBack, onStart }: Props) {
   const [names, setNames] = useState<string[]>(['', '']);
   const [holeCount, setHoleCount] = useState(9);
+  const [targetScore, setTargetScore] = useState(500);
+  const [mustGoOut, setMustGoOut] = useState(false);
   const [conditions, setConditions] = useState<
     { playerIdx: number; text: string }[]
   >([{ playerIdx: 0, text: '' }]);
@@ -37,6 +39,8 @@ export default function SetupScreen({ type, info, onBack, onStart }: Props) {
     onStart(type, {
       names,
       holeCount: Math.min(18, Math.max(1, holeCount || 9)),
+      targetScore,
+      mustGoOut,
       conditions: conditions
         .filter((c) => c.text.trim())
         .map((c) => ({
@@ -111,6 +115,36 @@ export default function SetupScreen({ type, info, onBack, onStart }: Props) {
           </select>
         </label>
           <p className="muted">Pick a 9-hole round or a full 18.</p>
+        </section>
+      )}
+
+      {type === 'rummy500' && (
+        <section className="setup-section">
+          <h2 className="section-title">Rummy 500 options</h2>
+          <label className="field">
+            Target score
+            <select
+              value={targetScore}
+              onChange={(e) => setTargetScore(Number(e.target.value))}
+            >
+              <option value={250}>250 points</option>
+              <option value={300}>300 points</option>
+              <option value={500}>500 points</option>
+              <option value={1000}>1000 points</option>
+            </select>
+          </label>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={mustGoOut}
+              onChange={(e) => setMustGoOut(e.target.checked)}
+            />
+            <span>Must go out to win</span>
+          </label>
+          <p className="muted small-note">
+            With this on, reaching the target is not enough — the player must
+            also be the one who emptied their hand in that round.
+          </p>
         </section>
       )}
 
